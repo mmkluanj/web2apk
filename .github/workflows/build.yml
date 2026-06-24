@@ -2,22 +2,37 @@ name: Build APK
 
 on:
   workflow_dispatch:
+    inputs:
+      url:
+        description: 'Website URL'
+        required: false
+      app_name:
+        description: 'App Name'
+        required: true
+      package_name:
+        description: 'Package Name'
+        required: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Flutter
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
       
       - name: Build APK
         run: |
-          flutter create test_app
-          cd test_app
-          flutter build apk
-          
+          flutter create --org com.myapp myapp
+          cd myapp
+          flutter build apk --release
+          ls -la build/app/outputs/flutter-apk/
+      
       - name: Upload
         uses: actions/upload-artifact@v3
         with:
           name: app-release
-          path: test_app/build/app/outputs/flutter-apk/app-release.apk
+          path: myapp/build/app/outputs/flutter-apk/*.apk
