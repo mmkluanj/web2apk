@@ -2,74 +2,22 @@ name: Build APK
 
 on:
   workflow_dispatch:
-    inputs:
-      url:
-        description: 'Website URL'
-        required: false
-        default: ''
-      app_name:
-        description: 'Nama Aplikasi'
-        required: true
-        default: 'MyApp'
-      package_name:
-        description: 'Package Name'
-        required: true
-        default: 'com.example.app'
-      user_id:
-        description: 'User ID Telegram'
-        required: true
-        default: '0'
-      zip_url:
-        description: 'URL ZIP Flutter'
-        required: false
-        default: ''
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-      
-      - name: Setup Flutter
+      - name: Install Flutter
         uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.16.0'
       
-      - name: Create Project & Build
+      - name: Build APK
         run: |
-          echo "📱 Creating Flutter project..."
+          flutter create test_app
+          cd test_app
+          flutter build apk
           
-          # Buat folder project
-          mkdir -p app
-          cd app
-          
-          # Buat Flutter project
-          flutter create --org com.web2apk --project-name myapp .
-          
-          echo "📦 Building APK..."
-          flutter pub get
-          flutter build apk --release
-          
-          echo "✅ Build complete!"
-      
-      - name: Upload APK
+      - name: Upload
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ inputs.app_name }}
-          path: app/build/app/outputs/flutter-apk/*.apk
+          name: app-release
+          path: test_app/build/app/outputs/flutter-apk/app-release.apk
