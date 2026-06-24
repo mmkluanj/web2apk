@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'Website URL (kosongkan jika pakai ZIP)'
+        description: 'Website URL'
         required: false
         default: ''
       app_name:
@@ -12,7 +12,7 @@ on:
         required: true
         default: 'MyApp'
       package_name:
-        description: 'Package Name (com.example.app)'
+        description: 'Package Name'
         required: true
         default: 'com.example.app'
       user_id:
@@ -20,7 +20,7 @@ on:
         required: true
         default: '0'
       zip_url:
-        description: 'URL ZIP (untuk Flutter project)'
+        description: 'URL ZIP Flutter'
         required: false
         default: ''
 
@@ -29,8 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # ============ SETUP ENVIRONMENT ============
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
       
       - name: Setup Node.js
@@ -52,60 +51,25 @@ jobs:
         with:
           flutter-version: '3.16.0'
       
-      # ============ DOWNLOAD PROJECT ============
-      - name: Download Project
+      - name: Create Project & Build
         run: |
-          mkdir -p project
-          cd project
+          echo "📱 Creating Flutter project..."
           
-          if [ -n "${{ inputs.zip_url }}" ]; then
-            echo "📦 Downloading from ZIP: ${{ inputs.zip_url }}"
-            wget -q "${{ inputs.zip_url }}" -O project.zip
-            unzip -q project.zip
-            rm project.zip
-            echo "✅ ZIP extracted!"
-          else
-            echo "🌐 Using URL: ${{ inputs.url }}"
-            # Buat project Flutter kosong jika tidak ada URL
-            if [ -z "${{ inputs.url }}" ]; then
-              echo "⚠️ No URL provided, creating empty Flutter project..."
-              flutter create --org com.web2apk .
-            else
-              # Coba clone URL (jika repo git)
-              git clone "${{ inputs.url }}" ./ || echo "Not a git repo, using direct download"
-            fi
-          fi
+          # Buat folder project
+          mkdir -p app
+          cd app
           
-          ls -la
+          # Buat Flutter project
+          flutter create --org com.web2apk --project-name myapp .
+          
+          echo "📦 Building APK..."
+          flutter pub get
+          flutter build apk --release
+          
+          echo "✅ Build complete!"
       
-      # ============ BUILD APK ============
-      - name: Build APK
-        run: |
-          cd project
-          
-          if [ -f "pubspec.yaml" ]; then
-            echo "📱 Flutter project detected!"
-            flutter pub get
-            flutter build apk --release
-            echo "✅ Build complete!"
-          else
-            echo "📱 Using PWA2APK for website..."
-            npm install -g pwa2apk
-            pwa2apk --url "${{ inputs.url }}" \
-                    --name "${{ inputs.app_name }}" \
-                    --package "${{ inputs.package_name }}"
-          fi
-          
-          # Cari file APK
-          echo "📁 Looking for APK files..."
-          find . -name "*.apk" -exec ls -lh {} \;
-      
-      # ============ UPLOAD ARTIFACT ============
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: ${{ inputs.app_name }}
-          path: |
-            project/build/app/outputs/flutter-apk/*.apk
-            project/*.apk
-            project/build/app/outputs/apk/release/*.apk
+          path: app/build/app/outputs/flutter-apk/*.apk
