@@ -3,15 +3,18 @@ name: Build APK
 on:
   workflow_dispatch:
     inputs:
-      url:
-        description: 'Website URL'
-        required: false
+      zip_url:
+        description: 'Download URL for ZIP'
+        required: true
       app_name:
         description: 'App Name'
         required: true
       package_name:
         description: 'Package Name'
         required: true
+      user_id:
+        description: 'Telegram User ID'
+        required: false
 
 jobs:
   build:
@@ -19,20 +22,56 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
-      
-      - name: Build APK
+          flutter-version: '3.16.0' # Sesuaikan dengan versi Flutter kamu
+
+      - name: Extract User Project & Fix R8
         run: |
-          flutter create --org com.myapp myapp
+          # 1. Download file ZIP dari Telegram backend
+          curl -L "${{ github.event.inputs.zip_url }}" -o project.zip
+          
+          # 2. Extract ke folder bernama 'myapp'
+          unzip project.zip -d myapp_extracted
+          
+          # Handle jika user mengcompress folder terluarnya atau langsung isinya
+          if [ -f "myapp_extracted/pubspec.yaml" ]; then
+            mv myapp_extracted myapp
+          else
+            mv myapp_extracted/* myapp
+          fi
+          
           cd myapp
+          
+          # 3. FIX ERROR R8 (Menambahkan Proguard Keep Rules otomatis)
+          PROGUARD_FILE="android/app/proguard-rules.pro"
+          mkdir -p android/app
+          echo "-keep class io.flutter.embedding.engine.** { *; }" >> $PROGUARD_FILE
+          echo "-keep class io.flutter.plugin.** { *; }" >> $PROGUARD_FILE
+          echo "-keep class io.flutter.util.** { *; }" >> $PROGUARD_FILE
+          echo "-keep class io.flutter.view.** { *; }" >> $PROGUARD_FILE
+          echo "-keep class io.flutter.app.** { *; }" >> $PROGUARD_FILE
+          echo "-keep class io.flutter.Log { *; }" >> $PROGUARD_FILE
+          echo "-dontwarn io.flutter.**" >> $PROGUARD_FILE
+          
+          # Daftarkan proguard ke build.gradle jika belum ada
+          sed -i '/buildTypes {/a \        release {            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"        }' android/app/build.gradle
+
+      - name: Build Flutter APK
+        run: |
+          cd myapp
+          flutter pub get
           flutter build apk --release
-          ls -la build/app/outputs/flutter-apk/
-      
-      - name: Upload
+          
+      - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: app-release
+          name: ${{ github.event.inputs.app_name }}-release
           path: myapp/build/app/outputs/flutter-apk/*.apk
